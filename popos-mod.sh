@@ -4,35 +4,103 @@
 # Define colors for whiptail
 
 # Function to check if a command exists
-command_exists() {
-    command -v "$1" >/dev/null 2>&1
-}
+    command_exists() {
+        command -v "$1" >/dev/null 2>&1
+    }
 
-# Function to cache sudo credentials
-cache_sudo_credentials() {
-    echo "Caching sudo credentials for script execution..."
-    sudo -v
-    # Keep sudo credentials fresh for the duration of the script
-    (while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &)
-}
+# Cache sudo credentials
+    cache_sudo_credentials() {
+        echo "Caching sudo credentials for script execution..."
+        sudo -v
+        # Keep sudo credentials fresh for the duration of the script
+        (while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &)
+    }
 
-# Checks for active network connection
-if [[ -n "$(command -v nmcli)" && "$(nmcli -t -f STATE g)" != connected ]]; then
-    awk '{print}' <<<"Network connectivity is required to continue."
-    exit
-fi
+# Check for active network connection
+    if command_exists nmcli; then
+        state=$(nmcli -t -f STATE g)
+        if [[ "$state" != connected ]]; then
+            echo "Network connectivity is required to continue."
+            exit 1
+        fi
+    else
+        # Fallback: ensure at least one interface has an IPv4 address
+        if ! ip -4 addr show | grep -q "inet "; then
+            echo "Network connectivity is required to continue."
+            exit 1
+        fi
+    fi
+        # Additional ping test to confirm internet reachability
+        if ! ping -c 1 -W 1 8.8.8.8 >/dev/null 2>&1; then
+            echo "Network connectivity is required to continue."
+            exit 1
+        fi
+
 
 # Install required tools for TUI
-if ! command -v whiptail &> /dev/null; then
-    echo -e "${YELLOW}Installing whiptail...${NC}"
-    apt install whiptail -y
-fi
+    if ! command -v whiptail &> /dev/null; then
+        echo -e "${YELLOW}Installing whiptail...${NC}"
+        apt install whiptail -y
+    fi
 
 username=$(id -u -n 1000)
 builddir=$(pwd)
 
-# Cache sudo credentials
-cache_sudo_credentials
+setup_cosmic_customizations_autostart_from_repo() {
+    local repo_dir="$builddir/piercing-dots"
+    local script_src="$repo_dir/scripts/cosmic-customizations.sh"
+    local home_dir
+    home_dir="$(getent passwd "$username" | cut -d: -f6)"
+    [ -z "$home_dir" ] && home_dir="/home/$username"
+
+    [ -f "$script_src" ] || return 0
+
+    local autostart_dir="$home_dir/.config/autostart"
+    local runner_dir="$home_dir/.local/bin"
+    local script_dir="$home_dir/.local/share/piercing-dots"
+    local runner="$runner_dir/piercingxx-cosmic-customizations-once.sh"
+    local autostart_file="$autostart_dir/piercingxx-cosmic-customizations.desktop"
+
+    sudo mkdir -p "$autostart_dir" "$runner_dir" "$script_dir"
+    sudo cp -f "$script_src" "$script_dir/cosmic-customizations.sh"
+    sudo chmod +x "$script_dir/cosmic-customizations.sh"
+    sudo chown -R "$username":"$username" "$runner_dir" "$script_dir" "$autostart_dir"
+
+    sudo tee "$runner" >/dev/null <<'EOF'
+#!/bin/bash
+set -e
+
+marker="$HOME/.config/piercingxx-cosmic-customizations.applied"
+script="$HOME/.local/share/piercing-dots/cosmic-customizations.sh"
+autostart="$HOME/.config/autostart/piercingxx-cosmic-customizations.desktop"
+
+if [ -f "$marker" ]; then
+    rm -f "$autostart"
+    exit 0
+fi
+
+if [ ! -x "$script" ]; then
+    rm -f "$autostart"
+    exit 0
+fi
+
+"$script"
+touch "$marker"
+rm -f "$autostart"
+EOF
+    sudo chmod +x "$runner"
+    sudo chown "$username":"$username" "$runner"
+
+    sudo tee "$autostart_file" >/dev/null <<EOF
+[Desktop Entry]
+Type=Application
+Name=PiercingXX COSMIC Customizations (One-time)
+Exec=$runner
+X-GNOME-Autostart-enabled=true
+NoDisplay=true
+EOF
+    sudo chown "$username":"$username" "$autostart_file"
+}
 
 # Function to display a message box
 function msg_box() {
@@ -43,133 +111,111 @@ function msg_box() {
 function menu() {
     whiptail --backtitle "GitHub.com/PiercingXX" --title "Main Menu" \
         --menu "Run Options In Order:" 0 0 0 \
-        "Update System"                         "Update System" \
-        "Install Dependencies"                  "Installs Dependencies" \
-        "Applications"                          "Install Applications and Utilities" \
-        "Piercing Gimp"                         "Piercing Gimp Presets (Distro Agnostic)" \
-        "Surface Kernel"                        "Install Surface Kernal" \
-        "PiercingXX Rice"                       "Apply Piercing Rice (Distro Agnostic)" \
-        "Beautiful Bash"                        "Chris Titus' Beautiful Bash Script" \
+        "Install"                               "Install PiercingXX Pop!_OS" \
+        "Nvidia Driver"                         "Install Nvidia Drivers (Do not install on a Surface Device)" \
+        "Apply KooTigers Touchscreen Driver"    "Apply KooTigers Touchscreen Driver" \
+        "Apply NuVision 8in Tablet Fixes"       "Apply NuVision 8in Tablet Fixes" \
+        "Optional Surface Kernel"               "Microsoft Surface Kernel" \
         "Reboot System"                         "Reboot the system" \
         "Exit"                                  "Exit the script" 3>&1 1>&2 2>&3
 }
 # Main menu loop
 while true; do
     clear
-    echo -e "${BLUE}PiercingXX's Arch Mod Script${NC}"
     echo -e "${GREEN}Welcome ${username}${NC}\n"
     choice=$(menu)
     case $choice in
-        "Update System")
+        "Install")
             echo -e "${YELLOW}Updating System...${NC}"
-            # Check if nala is installed
-                if ! command_exists nala; then
-                echo "nala is not installed. Installing now..."
-                # Install nala using apt
-                sudo apt install nala -y
-                fi
-            wait
-            # Check if flatpak is installed and update it
-                if command_exists flatpak; then
-                    echo "Updating flatpak packages..."
-                    flatpak update -y
-                else
-                    echo "Flatpak is not installed."
-                fi
-            wait
-            echo -e "${GREEN}System Updated Successfully!${NC}"
-            ;;
-        "Install Dependencies")
-            echo -e "${YELLOW}Installing Gnome...${NC}"
+            # Install Rust here, not in subscript
+                # Ensure Rust is installed
+                    if ! command_exists cargo; then
+                        echo -e "${YELLOW}Installing Rust toolchain…${NC}"
+                        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+                        rustup update
+                        # Load the new cargo environment for this shell
+                        source "$HOME/.cargo/env"
+                    fi
+            # Install Dependencies
                 cd scripts || exit
-                chmod u+x 1.sh
-                sudo ./1.sh
+                chmod u+x step-1.sh
+                sudo ./step-1.sh
+                wait
                 cd "$builddir" || exit
-            echo -e "${GREEN}Gnome Installed Successfully!${NC}"
-            ;;
-        "Applications")
-            echo -e "${YELLOW}Installing Core Applications...${NC}"
-                cd scripts || exit
-                chmod u+x 2.sh
-                sudo ./2.sh
-                cd "$builddir" || exit
-            echo -e "${GREEN}Core Apps Installed successfully!${NC}"
-            ;;
-        "Piercing Gimp")
-            # Gimp Dots
-                echo -e "${YELLOW}Installing Piercing Gimp Presets...${NC}"
-                if git clone https://github.com/Piercingxx/gimp-dots.git; then
-                    chmod -R u+x gimp-dots
-                    chown -R "$username":"$username" gimp-dots
-                    sudo rm -Rf /home/"$username"/.var/app/org.gimp.GIMP/config/GIMP/*
-                    sudo rm -Rf /home/"$username"/.config/GIMP/*
-                    mkdir -p /home/"$username"/.config/GIMP/3.0
-                    chown -R "$username":"$username" /home/"$username"/.config/GIMP
-                    cd gimp-dots/Gimp || exit
-                    cp -Rf 3.0/* /home/"$username"/.config/GIMP/3.0
-                    chown "$username":"$username" -R /home/"$username"/.config/GIMP
-                    cd "$builddir" || exit
-                    echo -e "${GREEN}Piercing Gimp Presets Installed Successfully!${NC}"
-                else
-                    echo -e "${RED}Failed to clone gimp-dots repository${NC}"
-                fi
-            ;;
-        "PiercingXX Rice")
-            echo -e "${YELLOW}Downloading and Applying PiercingXX Rice...${NC}"
-                # .config Dot Files
-                echo -e "${YELLOW}Downloading PiercingXX Dot Files...${NC}"
-                    git clone https://github.com/Piercingxx/piercing-dots.git
-                        chmod -R u+x piercing-dots
-                        chown -R "$username":"$username" piercing-dots
-                        cd piercing-dots || exit
-                        cp -Rf dots/* /home/"$username"/.config/
-                        chown "$username":"$username" -R /home/"$username"/.config/*
-                        cd "$builddir" || exit      
-                    echo -e "${GREEN}PiercingXX Dot Files Applied Successfully!${NC}"
-                # Piercings Gnome Customizations
-                    echo -e "${YELLOW}Applying PiercingXX Gnome Customizations...${NC}"
-                        cd piercing-dots || exit
-                        cd scripts || exit
-                        ./gnome-customizations.sh
-                        cd "$builddir" || exit
-                # Add in backgrounds and themes and apply them
-                    mkdir -p /home/"$username"/Pictures/backgrounds
-                    chown -R "$username":"$username" /home/"$username"/Pictures/backgrounds
-                    cp -Rf piercing-dots/backgrounds/* /home/"$username"/Pictures/backgrounds
-                    chown -R "$username":"$username" /home/"$username"/Pictures/backgrounds
-                    mkdir -p /home/"$username"/Pictures/profile-image
-                    chown -R "$username":"$username" /home/"$username"/Pictures/profile-image
-                    cp -Rf piercing-dots/profile-image/* /home/"$username"/Pictures/profile-image
-                    chown -R "$username":"$username" /home/"$username"/Pictures/profile-images
-                    cd "$builddir" || exit
-                # Copy Refs to Download folder
-                    mkdir -p /home/"$username"/Downloads/refs
-                    chown -R "$username":"$username" /home/"$username"/Downloads/refs
-                    cp -Rf piercing-dots/refs/* /home/"$username"/Downloads/refs
-                    chown -R "$username":"$username" /home/"$username"/Downloads/refs
+            # Apply Piercing Rice
+                echo -e "${YELLOW}Applying PiercingXX COSMIC Customizations...${NC}"
                 rm -rf piercing-dots
-            echo -e "${GREEN}PiercingXX Rice Applied Successfully!${NC}"
+                git clone --depth 1 https://github.com/Piercingxx/piercing-dots.git
+                cd piercing-dots || exit
+                chmod u+x install.sh
+                ./install.sh
+                wait
+                cd "$builddir" || exit
+            # Install Apps & Dependencies
+                echo -e "${YELLOW}Installing Apps & Dependencies...${NC}"
+                cd scripts || exit
+                chmod u+x apps.sh
+                sudo ./apps.sh
+                wait
+                cd "$builddir" || exit
+            # Apply Piercing COSMIC Customizations as User
+                cd piercing-dots/scripts || exit
+                ./cosmic-customizations.sh
+                wait
+                cd "$builddir" || exit
+            # Ensure COSMIC customizations run once on first login
+                setup_cosmic_customizations_autostart_from_repo
+            # Replace .bashrc
+                cp -f piercing-dots/resources/bash/.bashrc /home/"$username"/.bashrc
+                source ~/.bashrc
+            # Bash Stuff
+                install_bashrc_support
+            # Clean Up
+                rm -rf piercing-dots
+            echo -e "${GREEN}PiercingXX COSMIC Customizations Applied successfully!${NC}"
+            # COSMIC uses its own display manager, no need to enable gdm3
+            wait
+            msg_box "System will reboot now."
+            sudo reboot
             ;;
-        "Surface Kernel")
+        "Nvidia Driver")
+            echo -e "${YELLOW}Installing Nvidia Drivers...${NC}"
+            # Install Nvidia Drivers
+                cd scripts || exit
+                chmod u+x nvidia.sh
+                sudo ./nvidia.sh
+                wait
+                cd "$builddir" || exit
+            echo -e "${GREEN}Nvidia Drivers Installed Successfully!${NC}"
+            msg_box "Nvidia Drivers installed successfully. Reboot the system to apply changes."
+            sudo reboot
+            ;;
+        "Apply KooTigers Touchscreen Driver")
+            echo -e "${YELLOW}Applying KooTigers Touchscreen Driver...${NC}"
+            cd resources/KooTigers-drivers/ || exit
+            chmod +x ./kootigers-drivers.sh
+            sudo ./kootigers-drivers.sh
+            cd "$builddir" || exit
+            echo -e "${GREEN}KooTigers Touchscreen Driver Applied Successfully! Please Reboot!${NC}"
+            ;;
+        "Apply NuVision 8in Tablet Fixes")
+            echo -e "${YELLOW}Applying NuVision 8in Tablet Fixes...${NC}"
+            cd resources/NuVision-8in-tablet/ || exit
+            chmod +x ./nuvision-tablet-drivers.sh
+            sudo ./nuvision-tablet-drivers.sh
+            cd "$builddir" || exit
+            echo -e "${GREEN}NuVision 8in Tablet Fixes Applied Successfully! Please Reboot!${NC}"
+            ;;
+        "Optional Surface Kernel")
             echo -e "${YELLOW}Microsoft Surface Kernel...${NC}"            
                 cd scripts || exit
                 chmod u+x Surface.sh
                 sudo ./Surface.sh
                 cd "$builddir" || exit
             ;;
-        "Beautiful Bash")
-            echo -e "${YELLOW}Installing Beautiful Bash...${NC}"
-                git clone https://github.com/christitustech/mybash
-                    chmod -R u+x mybash
-                    chown -R "$username":"$username" mybash
-                    cd mybash || exit
-                    ./setup.sh
-                    cd "$builddir" || exit
-                    rm -rf mybash
-            ;;
         "Reboot System")
             echo -e "${YELLOW}Rebooting system in 3 seconds...${NC}"
-            sleep 2
+            sleep 1
             sudo reboot
             ;;
         "Exit")
@@ -184,3 +230,4 @@ while true; do
         break
     done
 done
+
