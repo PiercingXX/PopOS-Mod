@@ -127,15 +127,6 @@ while true; do
     case $choice in
         "Install")
             echo -e "${YELLOW}Updating System...${NC}"
-            # Install Rust here, not in subscript
-                # Ensure Rust is installed
-                    if ! command_exists cargo; then
-                        echo -e "${YELLOW}Installing Rust toolchain…${NC}"
-                        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-                        rustup update
-                        # Load the new cargo environment for this shell
-                        source "$HOME/.cargo/env"
-                    fi
             # Install Dependencies
                 cd scripts || exit
                 chmod u+x step-1.sh
