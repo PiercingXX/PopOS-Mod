@@ -133,11 +133,14 @@ while true; do
                 echo -e "${YELLOW}Applying PiercingXX COSMIC Customizations...${NC}"
                 rm -rf piercing-dots
                 git clone --depth 1 https://github.com/Piercingxx/piercing-dots.git
-                cd piercing-dots || exit
+                pushd piercing-dots >/dev/null || exit
+                if [ -f scripts/setup-terminal-session.sh ]; then
+                    rm -f scripts/setup-terminal-session.sh
+                fi
                 chmod u+x install.sh
                 ./install.sh
                 wait
-                cd "$builddir" || exit
+                popd >/dev/null || exit
             # Install Apps & Dependencies
                 echo -e "${YELLOW}Installing Apps & Dependencies...${NC}"
                 cd scripts || exit
