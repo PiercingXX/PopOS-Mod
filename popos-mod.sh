@@ -112,10 +112,6 @@ function menu() {
     whiptail --backtitle "GitHub.com/PiercingXX" --title "Main Menu" \
         --menu "Run Options In Order:" 0 0 0 \
         "Install"                               "Install PiercingXX Pop!_OS" \
-        "Nvidia Driver"                         "Install Nvidia Drivers (Do not install on a Surface Device)" \
-        "Apply KooTigers Touchscreen Driver"    "Apply KooTigers Touchscreen Driver" \
-        "Apply NuVision 8in Tablet Fixes"       "Apply NuVision 8in Tablet Fixes" \
-        "Optional Surface Kernel"               "Microsoft Surface Kernel" \
         "Reboot System"                         "Reboot the system" \
         "Exit"                                  "Exit the script" 3>&1 1>&2 2>&3
 }
@@ -149,13 +145,6 @@ while true; do
                 sudo ./apps.sh
                 wait
                 cd "$builddir" || exit
-            # Apply Piercing COSMIC Customizations as User
-                cd piercing-dots/scripts || exit
-                ./cosmic-customizations.sh
-                wait
-                cd "$builddir" || exit
-            # Ensure COSMIC customizations run once on first login
-                setup_cosmic_customizations_autostart_from_repo
             # Replace .bashrc
                 cp -f piercing-dots/resources/bash/.bashrc /home/"$username"/.bashrc
                 source ~/.bashrc
@@ -168,41 +157,6 @@ while true; do
             wait
             msg_box "System will reboot now."
             sudo reboot
-            ;;
-        "Nvidia Driver")
-            echo -e "${YELLOW}Installing Nvidia Drivers...${NC}"
-            # Install Nvidia Drivers
-                cd scripts || exit
-                chmod u+x nvidia.sh
-                sudo ./nvidia.sh
-                wait
-                cd "$builddir" || exit
-            echo -e "${GREEN}Nvidia Drivers Installed Successfully!${NC}"
-            msg_box "Nvidia Drivers installed successfully. Reboot the system to apply changes."
-            sudo reboot
-            ;;
-        "Apply KooTigers Touchscreen Driver")
-            echo -e "${YELLOW}Applying KooTigers Touchscreen Driver...${NC}"
-            cd resources/KooTigers-drivers/ || exit
-            chmod +x ./kootigers-drivers.sh
-            sudo ./kootigers-drivers.sh
-            cd "$builddir" || exit
-            echo -e "${GREEN}KooTigers Touchscreen Driver Applied Successfully! Please Reboot!${NC}"
-            ;;
-        "Apply NuVision 8in Tablet Fixes")
-            echo -e "${YELLOW}Applying NuVision 8in Tablet Fixes...${NC}"
-            cd resources/NuVision-8in-tablet/ || exit
-            chmod +x ./nuvision-tablet-drivers.sh
-            sudo ./nuvision-tablet-drivers.sh
-            cd "$builddir" || exit
-            echo -e "${GREEN}NuVision 8in Tablet Fixes Applied Successfully! Please Reboot!${NC}"
-            ;;
-        "Optional Surface Kernel")
-            echo -e "${YELLOW}Microsoft Surface Kernel...${NC}"            
-                cd scripts || exit
-                chmod u+x Surface.sh
-                sudo ./Surface.sh
-                cd "$builddir" || exit
             ;;
         "Reboot System")
             echo -e "${YELLOW}Rebooting system in 3 seconds...${NC}"
