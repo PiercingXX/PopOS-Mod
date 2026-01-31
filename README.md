@@ -11,8 +11,7 @@ Automates essential package installation, COSMIC configuration, and system tweak
 
 - Optimized for Pop!_OS with COSMIC DE
 - Lightweight and fast, perfect for laptops and touch devices
-- Optional Microsoft Surface kernel support
-- Touch-friendly configuration (3-finger workspace gestures)
+- Touch-friendly configuration (workspace gestures)
 - Applies [Piercing‑Dots](https://github.com/PiercingXX/piercing-dots) minimal dotfiles
 
 
