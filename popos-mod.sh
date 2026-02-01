@@ -73,18 +73,6 @@ while true; do
                 sudo ./step-1.sh
                 wait
                 cd "$builddir" || exit
-            # Apply Piercing Rice
-                echo -e "${YELLOW}Applying PiercingXX COSMIC Customizations...${NC}"
-                rm -rf piercing-dots
-                git clone --depth 1 https://github.com/Piercingxx/piercing-dots.git
-                pushd piercing-dots >/dev/null || exit
-                if [ -f scripts/setup-terminal-session.sh ]; then
-                    rm -f scripts/setup-terminal-session.sh
-                fi
-                chmod u+x install.sh
-                ./install.sh
-                wait
-                popd >/dev/null || exit
             # Install Apps & Dependencies
                 echo -e "${YELLOW}Installing Apps & Dependencies...${NC}"
                 cd scripts || exit
@@ -92,13 +80,6 @@ while true; do
                 sudo ./apps.sh
                 wait
                 cd "$builddir" || exit
-            # Replace .bashrc
-                cp -f piercing-dots/resources/bash/.bashrc /home/"$username"/.bashrc
-                source ~/.bashrc
-            # Bash Stuff
-                install_bashrc_support
-            # Clean Up
-                rm -rf piercing-dots
             echo -e "${GREEN}PiercingXX COSMIC Customizations Applied successfully!${NC}"
             wait
             msg_box "System will reboot now."
